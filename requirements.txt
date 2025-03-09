@@ -1,0 +1,7 @@
+gymnasium
+tensorboard
+stable-baselines3
+torch 
+torchvision
+torchaudio
+numpy
