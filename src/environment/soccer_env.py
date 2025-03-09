@@ -13,7 +13,6 @@ class SoccerEnv(gym.Env):
         self.width = width
         self.height = height
 
-
         self.goal_width = 200  
         self.goal_height = 50  
         self.goal_x = width // 2 
@@ -21,12 +20,14 @@ class SoccerEnv(gym.Env):
         self.goal_left = self.goal_x - self.goal_width / 2
         self.goal_right = self.goal_x + self.goal_width / 2
 
+        # Espaço de ação: deslocamento horizontal do goleiro
         self.action_space = spaces.Box(low=-50.0, high=50.0, shape=(1,), dtype=np.float32)
         
         obs_low = np.array([0, 0, 0, -np.inf, -np.inf], dtype=np.float32)
         obs_high = np.array([width, width, height, np.inf, np.inf], dtype=np.float32)
         self.observation_space = spaces.Box(low=obs_low, high=obs_high, dtype=np.float32)
 
+        # Inicializa o goleiro na área do gol
         self.goalkeeper_pos = np.array([self.goal_x, height - 30], dtype=np.float32)
 
         self.ball_pos = None
@@ -37,10 +38,10 @@ class SoccerEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         """
-        Reinicia o ambiente para o início de um episódio:
-        - Reposiciona o goleiro no centro do gol.
-        - Posiciona a bola no centro do topo do campo.
-        - Chuta a bola em direção a uma posição aleatória dentro do gol.
+        Reinicia o ambiente:
+         - Reposiciona o goleiro no centro do gol.
+         - Posiciona a bola no centro do topo do campo.
+         - Chuta a bola em direção a uma posição aleatória dentro do gol.
         """
         self.goalkeeper_pos = np.array([self.goal_x, self.height - 30], dtype=np.float32)
         self.done = False
@@ -58,7 +59,6 @@ class SoccerEnv(gym.Env):
 
         self.last_reward = 0.0
         return self._get_state(), {}
-
 
     def _get_state(self):
         return np.array([
@@ -78,15 +78,21 @@ class SoccerEnv(gym.Env):
         self.ball_pos += self.ball_vel
         reward = 0.0
 
-        # Se a bola atingir a linha do gol
-        if self.ball_pos[1] >= self.height:
-            # Calcula a distância Euclidiana entre o goleiro e a bola
-            d = np.linalg.norm(self.goalkeeper_pos - self.ball_pos)
-            # Se a distância for menor que 23 pixels (15+8), considere que houve colisão/defesa
-            if d < 23:
-                reward = 1.0  # Defesa bem-sucedida
+        # Se a bola atingir a área do gol (definida como a parte inferior do campo)
+        if self.ball_pos[1] >= self.height - self.goal_height:
+            goalie_radius = 15  # raio do goleiro (ajuste conforme necessário)
+            # Define o bounding box do goleiro:
+            goalie_x_min = self.goalkeeper_pos[0] - goalie_radius
+            goalie_x_max = self.goalkeeper_pos[0] + goalie_radius
+            goalie_y_min = self.goalkeeper_pos[1] - goalie_radius
+            goalie_y_max = self.goalkeeper_pos[1] + goalie_radius
+            
+            # Verifica se a bola está dentro do bounding box do goleiro
+            if goalie_x_min <= self.ball_pos[0] <= goalie_x_max and goalie_y_min <= self.ball_pos[1] <= goalie_y_max:
+                reward = 1.0  # defesa bem-sucedida
+                self.ball_vel = np.array([0.0, 0.0])  # congela a bola para visualização
             else:
-                reward = -1.0  # Gol sofrido
+                reward = -1.0  # gol sofrido
             self.done = True
 
         # Se a bola sair lateralmente do campo, penaliza
@@ -97,6 +103,7 @@ class SoccerEnv(gym.Env):
         self.last_reward = reward
         return self._get_state(), reward, self.done, False, {}
 
+
     def render(self, mode="human"):
         img = np.ones((self.height, self.width, 3), dtype=np.uint8) * 255
         cv2.rectangle(img, (0, 0), (self.width, self.height), (0, 255, 0), 2)
@@ -106,6 +113,7 @@ class SoccerEnv(gym.Env):
                       (goal_right, self.height), (0, 0, 255), 2)
         cv2.circle(img, (int(self.goalkeeper_pos[0]), int(self.goalkeeper_pos[1])), 15, (255, 0, 0), -1)
         cv2.circle(img, (int(self.ball_pos[0]), int(self.ball_pos[1])), 8, (0, 0, 0), -1)
+        # Exibe a recompensa no canto superior direito
         cv2.putText(img, f"Reward: {self.last_reward:.2f}", 
                     (self.width - 220, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
         cv2.imshow("Soccer Field", img)

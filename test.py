@@ -23,4 +23,4 @@ def evaluate(model, num_episodes=5):
 
 if __name__ == "__main__":
     model = SAC.load("sac_goalkeeper.zip") 
-    evaluate(model, num_episodes=5)
+    evaluate(model, num_episodes=500)
