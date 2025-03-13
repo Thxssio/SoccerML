@@ -1,3 +1,4 @@
+import threading
 from stable_baselines3.common.callbacks import BaseCallback
 
 class RenderCallback(BaseCallback):
@@ -11,5 +12,14 @@ class RenderCallback(BaseCallback):
 
     def _on_step(self) -> bool:
         if self.n_calls % self.render_freq == 0:
-            self.training_env.envs[0].render()
+            threading.Thread(target=self._render_env, daemon=True).start()
         return True
+
+    def _render_env(self):
+        """
+        Renderiza o ambiente de forma assíncrona para não travar o treinamento.
+        """
+        try:
+            self.training_env.envs[0].render()
+        except Exception as e:
+            print(f"Erro ao renderizar: {e}")
